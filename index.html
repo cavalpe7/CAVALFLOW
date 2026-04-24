@@ -1383,9 +1383,12 @@ async function processWaMessage(text){
     const p=S.waPending;S.waPending=null;
     
     // Save to Supabase
+    const { data: waSess } = await sbClient.auth.getSession();
+    const waUserId = waSess?.session?.user?.id;
+    if(!waUserId){ addWaBubble("recv","❌ Sesión expirada."); return; }
     toggleLoader(true);
-    const newMov = {id:uid(),...p,createdAt:Date.now()};
-    const {error} = await sbClient.from('movimientos').insert([mapMovToDB(newMov)]);
+    const newMov = {id:uid(),...p,createdAt:Date.now(),user_id:waUserId};
+    const {error} = await sbClient.from("movimientos").insert([mapMovToDB(newMov)]);
     toggleLoader(false);
     
     if(error){ toast('Error registrando por Bot','err'); return; }
@@ -1524,10 +1527,14 @@ async function handleSave(){
   const date=document.getElementById('dateInp').value;
   if(!amount||amount<=0){toast('Ingresa un monto válido','err');return;}
   if(!date){toast('Selecciona una fecha','err');return;}
-  
+
+  const { data: sessionData } = await sbClient.auth.getSession();
+  const userId = sessionData?.session?.user?.id;
+  if(!userId){ toast('Sesión expirada, vuelve a iniciar sesión','err'); return; }
+
   const isNew = !S.eId;
   const id = S.eId || uid();
-  const data={id, type:S.mType, amount, categoryId:S.mCat, bankId:S.mBank, currency:S.mCurrency, description:desc, date, createdAt:Date.now()};
+  const data={id, type:S.mType, amount, categoryId:S.mCat, bankId:S.mBank, currency:S.mCurrency, description:desc, date, createdAt:Date.now(), user_id:userId};
   
   toggleLoader(true);
   const {error} = await sbClient.from('movimientos').upsert([mapMovToDB(data)]);
