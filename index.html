@@ -905,7 +905,18 @@ function mapMovToJS(row){
   return { ...row, amount: parseFloat(row.amount || 0), categoryId: row.category_id, bankId: row.bank_id, createdAt: row.created_at };
 }
 function mapMovToDB(jsm){
-  return { ...jsm, category_id: jsm.categoryId, bank_id: jsm.bankId, created_at: jsm.createdAt || Date.now() };
+  return {
+    id: jsm.id,
+    type: jsm.type,
+    amount: jsm.amount,
+    category_id: jsm.categoryId,
+    bank_id: jsm.bankId,
+    currency: jsm.currency || 'PEN',
+    description: jsm.description || '',
+    date: jsm.date,
+    created_at: jsm.createdAt || Date.now(),
+    user_id: jsm.user_id
+  };
 }
 
 async function runLocalStorageMigration() {
