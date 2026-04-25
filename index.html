@@ -476,6 +476,7 @@ body.unauth .auth-wrap {
     <button class="sb-item"        id="sb-banks"      onclick="switchTab('banks')"><span class="si">🏦</span><span> Bancos</span></button>
     <button class="sb-item"        id="sb-categories" onclick="switchTab('categories')"><span class="si">🏷️</span><span> Categorías</span></button>
     <button class="sb-item"        id="sb-whatsapp"   onclick="switchTab('whatsapp')"><span class="si">💬</span><span> WhatsApp Bot</span></button>
+    <button class="sb-item" id="sb-admin-btn" onclick="switchTab('admin')" style="display:none"><span class="si">🛡️</span><span> Admin Panel</span></button>
   </nav>
   <div class="sb-sep"></div>
   <div class="sb-mon-label">Período</div>
@@ -604,6 +605,15 @@ body.unauth .auth-wrap {
   </div>
 </div>
 
+
+  <!-- ADMIN TAB -->
+  <div class="tab" id="tab-admin">
+    <div class="sh"><span class="sh-title">🛡️ Panel de Administrador</span></div>
+    <p style="color:var(--t2);padding:8px 0 4px;font-size:13px">Gestiona los usuarios registrados en Caval Flow.</p>
+    <div id="adminUsersWrap" style="display:grid;gap:10px;margin-top:8px"><p style="color:var(--t2)">Cargando...</p></div>
+    <div style="height:8px"></div>
+  </div>
+
 <!-- MOBILE BOTTOM NAV -->
 <nav class="mob-nav">
   <button class="nbtn active" id="nav-dashboard"  onclick="switchTab('dashboard')"><span class="ni">📊</span><span class="nl">Dashboard</span></button>
@@ -611,6 +621,7 @@ body.unauth .auth-wrap {
   <button class="fab" onclick="openModal()">＋</button>
   <button class="nbtn"        id="nav-banks"      onclick="switchTab('banks')"><span class="ni">🏦</span><span class="nl">Bancos</span></button>
   <button class="nbtn"        id="nav-whatsapp"   onclick="switchTab('whatsapp')"><span class="ni">💬</span><span class="nl">Bot</span></button>
+  <button class="nbtn" id="nav-admin" onclick="switchTab('admin')" style="display:none"><span class="ni">🛡️</span><span class="nl">Admin</span></button>
 </nav>
 
 <!-- MODAL: Movimiento -->
@@ -635,6 +646,27 @@ body.unauth .auth-wrap {
     <div class="fg"><label class="flbl">Banco / Billetera</label><div class="bank-picker" id="bankPicker"></div></div>
     <div class="fg"><label class="flbl">Fecha</label><input type="date" class="finp" id="dateInp"></div>
     <button class="savebtn" onclick="handleSave()">✓ Guardar Movimiento</button>
+    <button class="btn-outline" onclick="openTransferModal()" style="margin-top:8px;font-size:13px">🔄 Registrar Transferencia / Cambio USD</button>
+  </div>
+</div>
+
+<!-- MODAL: Transferencia -->
+<div class="overlay" id="transferOverlay" style="display:none" onclick="if(event.target===this)closeTransferModal()">
+  <div class="modal" id="transferModal">
+    <div class="mhandle"></div>
+    <p class="mtitle">🔄 Transferencia / Cambio de Divisa</p>
+    <p style="font-size:12px;color:var(--t2);margin-bottom:12px">Registra movimiento entre cuentas. Ej: compra de dólares.</p>
+    <div class="fg"><label class="flbl">Cuenta Origen (sale dinero)</label><select class="finp" id="trFrom"></select></div>
+    <div class="fg"><label class="flbl">Monto Origen</label><input type="number" class="finp" id="trAmtFrom" placeholder="0.00 (ej: soles que gastas)" step="0.01" min="0.01" inputmode="decimal"></div>
+    <div class="fg"><label class="flbl">Cuenta Destino (entra dinero)</label><select class="finp" id="trTo"></select></div>
+    <div class="fg"><label class="flbl">Monto Destino</label><input type="number" class="finp" id="trAmtTo" placeholder="0.00 (ej: dólares que recibes)" step="0.01" min="0.01" inputmode="decimal"></div>
+    <div class="fg"><label class="flbl">Tipo de cambio referencial</label><input type="number" class="finp" id="trRate" placeholder="Ej: 3.75" step="0.001" inputmode="decimal"></div>
+    <div class="fg"><label class="flbl">Fecha</label><input type="date" class="finp" id="trDate"></div>
+    <div class="fg"><label class="flbl">Descripción</label><input type="text" class="finp" id="trDesc" placeholder="Ej: Compra USD Binance"></div>
+    <div class="btn-row">
+      <button class="cancelbtn" onclick="closeTransferModal()">Cancelar</button>
+      <button class="savebtn" style="margin-top:0" onclick="handleTransferSave()">✓ Guardar Transferencia</button>
+    </div>
   </div>
 </div>
 
@@ -829,12 +861,43 @@ async function checkAuth(){
 function handleSession(session) {
   const isAuth = !!session;
   if(isAuth) {
+    S.currentUser = session.user;
     document.body.classList.remove('unauth');
+    renderUserGreeting();
     if(S.movs.length === 0) load();
   } else {
+    S.currentUser = null;
     document.body.classList.add('unauth');
     S.movs=[]; S.cats=[]; S.banks=[]; S.tab='dashboard';
   }
+}
+
+function renderUserGreeting(){
+  const u = S.currentUser;
+  if(!u) return;
+  const email = u.email || '';
+  const name = u.user_metadata?.full_name || email.split('@')[0] || 'Usuario';
+  const hour = new Date().getHours();
+  const greet = hour < 12 ? 'Buenos días' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
+  const isAdmin = ADMIN_EMAILS.includes(email.toLowerCase());
+  // Show/hide admin nav
+  ['sb-admin-btn','nav-admin'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.display = isAdmin ? '' : 'none';
+  });
+  // Sidebar footer
+  const sbFooter = document.querySelector('.sb-footer');
+  if(sbFooter) sbFooter.innerHTML = 'Caval Flow v2.0<br><span style="color:#25d366">● Online</span><br><span style="font-size:11px;color:var(--t1);font-weight:600">' + greet + ', ' + name + '</span>' + (isAdmin ? '<br><span style="color:var(--violetL);font-size:10px">🛡️ Administrador</span>' : '');
+  // Mobile greeting bar
+  let mgEl = document.getElementById('mob-greeting');
+  if(!mgEl){
+    mgEl = document.createElement('div');
+    mgEl.id = 'mob-greeting';
+    mgEl.style.cssText = 'padding:3px 14px 5px;font-size:12px;font-weight:600;color:var(--t1);background:var(--bg0);border-bottom:1px solid var(--br)';
+    const hdr = document.querySelector('.mob-hdr');
+    if(hdr) hdr.insertAdjacentElement('afterend', mgEl);
+  }
+  mgEl.innerHTML = '👋 ' + greet + ', <span style="color:var(--violetL)">' + name + '</span>' + (isAdmin ? ' <span style="background:var(--violetG);color:var(--violetL);padding:1px 7px;border-radius:999px;font-size:10px">🛡️ ADMIN</span>' : '');
 }
 
 async function handleLogin(){
@@ -1027,6 +1090,7 @@ function render(){
     if(S.tab==='dashboard') renderDash();
     if(S.tab==='history')   renderHist();
     if(S.tab==='banks')     renderBanks();
+    if(S.tab==='admin')     loadAdminPanel();
     if(S.tab==='categories')renderCats();
     if(S.tab==='whatsapp')  renderWA();
   }catch(e){
@@ -1240,7 +1304,16 @@ function renderBanks(){
   if(bGrid){
     bGrid.innerHTML=(S.banks||[]).map(b=>{
       const cur=b.currency||'PEN';
-      const spent=bankStats(S.mon,'expense',cur).find(s=>s.id===b.id)?.amount||0;
+      // Calcular disponible = saldo_inicial - todos los gastos + todos los ingresos
+      const saldoInicial = parseFloat(b.balance || b.saldo_inicial || 0);
+      const allExpense = S.movs.filter(m=>m.bankId===b.id&&m.type==='expense').reduce((s,m)=>s+(parseFloat(m.amount)||0),0);
+      const allIncome  = S.movs.filter(m=>m.bankId===b.id&&m.type==='income' ).reduce((s,m)=>s+(parseFloat(m.amount)||0),0);
+      // Gastos de billeteras vinculadas a este banco
+      const linkedWIds=(S.banks||[]).filter(w=>w.type==='wallet'&&(b.wallets||[]).includes(w.name)).map(w=>w.id);
+      const walletExp=S.movs.filter(m=>linkedWIds.includes(m.bankId)&&m.type==='expense').reduce((s,m)=>s+(parseFloat(m.amount)||0),0);
+      const totalExp = allExpense + walletExp;
+      const disponible = saldoInicial - totalExp + allIncome;
+      const dispColor = disponible >= 0 ? 'var(--green)' : 'var(--red)';
       const wArray = Array.isArray(b.wallets)?b.wallets:[];
       const walletTags=wArray.length?`<div class="wallet-chips">${wArray.map(w=>`<span class="wallet-chip">📱 ${w}</span>`).join('')}</div>`:'';
       return`<div class="bank-card" style="border-color:${b.color}33">
@@ -1253,13 +1326,20 @@ function renderBanks(){
           </div>
         </div>
         ${walletTags}
-        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:10px">
-          <div><div class="bank-bal-lbl">Gasto este mes</div><div class="bank-bal" style="color:${b.color}">${fmt(spent,cur)}</div></div>
-          ${(b.balance||0)>0?`<div style="text-align:right"><div class="bank-bal-lbl">Saldo</div><div style="font-size:14px;font-weight:600;color:var(--t1)">${fmt(b.balance,cur)}</div></div>`:''}
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+          <div style="background:var(--bg3);border-radius:var(--rs);padding:8px">
+            <div class="bank-bal-lbl">💸 Gasto total</div>
+            <div style="font-size:14px;font-weight:700;color:var(--red)">-${fmt(totalExp,cur)}</div>
+          </div>
+          <div style="background:var(--bg3);border-radius:var(--rs);padding:8px">
+            <div class="bank-bal-lbl">✅ Disponible</div>
+            <div class="bank-bal" style="color:${dispColor};font-size:18px">${fmt(disponible,cur)}</div>
+          </div>
         </div>
+        ${saldoInicial > 0 ? `<div style="font-size:10px;color:var(--t2);margin-top:4px">Saldo inicial: ${fmt(saldoInicial,cur)}</div>` : ''}
         <div class="bank-actions">
-          <button class="bank-btn" onclick="openBankModal('${b.id}')">✏️ Editar</button>
-          <button class="bank-btn danger" onclick="deleteBank('${b.id}')">🗑️ Borrar</button>
+          <button class="bank-btn" onclick="openBankModal('${b.id}')">&#x270F;&#xFE0F; Editar</button>
+          <button class="bank-btn danger" onclick="deleteBank('${b.id}')">&#x1F5D1;&#xFE0F; Borrar</button>
         </div>
       </div>`;
     }).join('');
@@ -1385,10 +1465,10 @@ async function processWaMessage(text){
     // Save to Supabase
     const { data: waSess } = await sbClient.auth.getSession();
     const waUserId = waSess?.session?.user?.id;
-    if(!waUserId){ addWaBubble("recv","❌ Sesión expirada."); return; }
+    if(!waUserId){ addWaBubble('recv','Sesión expirada.'); return; }
     toggleLoader(true);
     const newMov = {id:uid(),...p,createdAt:Date.now(),user_id:waUserId};
-    const {error} = await sbClient.from("movimientos").insert([mapMovToDB(newMov)]);
+    const {error} = await sbClient.from('movimientos').insert([mapMovToDB(newMov)]);
     toggleLoader(false);
     
     if(error){ toast('Error registrando por Bot','err'); return; }
@@ -1527,7 +1607,7 @@ async function handleSave(){
   const date=document.getElementById('dateInp').value;
   if(!amount||amount<=0){toast('Ingresa un monto válido','err');return;}
   if(!date){toast('Selecciona una fecha','err');return;}
-
+  
   const { data: sessionData } = await sbClient.auth.getSession();
   const userId = sessionData?.session?.user?.id;
   if(!userId){ toast('Sesión expirada, vuelve a iniciar sesión','err'); return; }
@@ -1778,7 +1858,7 @@ function last6(){
   const[y,m]=S.mon.split('-').map(Number);
   return Array.from({length:6},(_,i)=>{const d=new Date(y,m-1-5+i,1);return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;});
 }
-function catById(id){return (S.cats||[]).find(c=>c.id===id)||{icon:'💸',name:'Sin cat.',color:'#94a3b8'};}
+function catById(id){if(id==='transfer')return{icon:'🔄',name:'Transferencia',color:'#7c3aed'};return (S.cats||[]).find(c=>c.id===id)||{icon:'💸',name:'Sin cat.',color:'#94a3b8'};}
 function bankById(id){return (S.banks||[]).find(b=>b.id===id)||null;}
 
 /* ── FORMAT ───────────────────────────────────────────── */
@@ -1801,6 +1881,126 @@ let rTimer;
 window.addEventListener('resize',()=>{clearTimeout(rTimer);rTimer=setTimeout(()=>{Object.values(S.charts).forEach(c=>c?.destroy());S.charts={m:null,c:null,mb:null,cb:null,bk:null};render();},220);});
 
 /* ── INIT ─────────────────────────────────────────────── */
+
+/* \u2550\u2550 TRANSFER (Cambio de divisa / entre cuentas) \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+function openTransferModal(){
+  // Populate selects
+  const opts = (S.banks||[]).map(b=>`<option value="${b.id}">${b.icon} ${b.name} (${b.currency||'PEN'})</option>`).join('');
+  document.getElementById('trFrom').innerHTML = opts;
+  document.getElementById('trTo').innerHTML   = opts;
+  document.getElementById('trDate').value     = todayStr();
+  document.getElementById('trAmtFrom').value  = '';
+  document.getElementById('trAmtTo').value    = '';
+  document.getElementById('trRate').value     = '';
+  document.getElementById('trDesc').value     = '';
+  document.getElementById('transferOverlay').style.display='flex';
+}
+function closeTransferModal(){
+  document.getElementById('transferOverlay').style.display='none';
+}
+async function handleTransferSave(){
+  const fromId  = document.getElementById('trFrom').value;
+  const toId    = document.getElementById('trTo').value;
+  const amtFrom = parseFloat(document.getElementById('trAmtFrom').value);
+  const amtTo   = parseFloat(document.getElementById('trAmtTo').value);
+  const date    = document.getElementById('trDate').value;
+  const desc    = document.getElementById('trDesc').value.trim() || 'Transferencia';
+  if(!fromId||!toId||!amtFrom||!amtTo||!date){ toast('Completa todos los campos','err'); return; }
+  if(fromId===toId){ toast('La cuenta origen y destino deben ser distintas','err'); return; }
+  const fromBank = bankById(fromId);
+  const toBank   = bankById(toId);
+  const { data: sess } = await sbClient.auth.getSession();
+  const userId = sess?.session?.user?.id;
+  if(!userId){ toast('Sesión expirada','err'); return; }
+  // Create expense on origin + income on destination
+  const movOut = { id:uid(), type:'expense', amount:amtFrom, bankId:fromId, categoryId:'transfer', currency:fromBank?.currency||'PEN', description:desc + ' \u2192 ' + (toBank?.name||''), date, createdAt:Date.now(), user_id:userId };
+  const movIn  = { id:uid(), type:'income',  amount:amtTo,   bankId:toId,   categoryId:'transfer', currency:toBank?.currency||'PEN',  description:desc + ' \u2190 ' + (fromBank?.name||''), date, createdAt:Date.now(), user_id:userId };
+  toggleLoader(true);
+  const { error } = await sbClient.from('movimientos').insert([mapMovToDB(movOut), mapMovToDB(movIn)]);
+  toggleLoader(false);
+  if(error){ toast('Error al guardar transferencia','err'); console.error(error); return; }
+  S.movs.push(movOut, movIn);
+  closeTransferModal();
+  closeModal();
+  render();
+  toast('✅ Transferencia registrada correctamente','ok');
+}
+
+/* \u2550\u2550 ADMIN PANEL \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550 */
+async function loadAdminPanel(){
+  const wrap = document.getElementById('adminUsersWrap');
+  if(!wrap) return;
+  wrap.innerHTML = '<p style="color:var(--t2)">Cargando usuarios...</p>';
+  try {
+    // Fetch users list via Supabase auth admin (requires service role in backend)
+    // Since we use anon key, we fetch from a custom view or profiles table if exists
+    const { data, error } = await sbClient.from('user_profiles').select('*').order('created_at', {ascending:false});
+    if(error) throw error;
+    if(!data || data.length === 0){
+      wrap.innerHTML = '<p style="color:var(--t2);padding:16px">No se encontró la tabla <strong>user_profiles</strong>. Cr�ala en Supabase con el SQL de abajo.</p>' + adminSetupSQL();
+      return;
+    }
+    wrap.innerHTML = data.map(u => `
+      <div style="background:var(--bg2);border:1px solid var(--br);border-radius:var(--r);padding:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:700;font-size:14px">${u.email||u.id}</div>
+          <div style="font-size:11px;color:var(--t2)">Registrado: ${u.created_at?new Date(u.created_at).toLocaleDateString('es-PE'):'-'}</div>
+          <div style="margin-top:4px">
+            <span style="padding:2px 8px;border-radius:999px;font-size:10px;font-weight:700;background:${u.blocked?'var(--redG)':'var(--greenG)'};color:${u.blocked?'var(--redL)':'var(--greenL)'}">
+              ${u.blocked ? '🔒 BLOQUEADO' : '✅ ACTIVO'}
+            </span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="toggleUserBlock('${u.id}',${!u.blocked})" style="padding:7px 14px;border-radius:var(--rs);border:1px solid ${u.blocked?'var(--green)':'var(--red)'};background:transparent;color:${u.blocked?'var(--green)':'var(--red)'};font-weight:700;font-size:12px;cursor:pointer">
+            ${u.blocked ? '🔓 Desbloquear' : '🔒 Bloquear'}
+          </button>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    wrap.innerHTML = '<div style="color:var(--redL);padding:12px">' + e.message + '</div>' + adminSetupSQL();
+  }
+}
+
+function adminSetupSQL(){
+  return `<div style="margin-top:16px;background:var(--bg3);border-radius:var(--rs);padding:14px;font-size:12px">
+    <div style="color:var(--yellowG);font-weight:700;margin-bottom:8px">⚠️ Setup requerido en Supabase SQL Editor:</div>
+    <pre style="color:var(--t1);font-size:11px;white-space:pre-wrap">-- Crear tabla de perfiles de usuario
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id uuid PRIMARY KEY REFERENCES auth.users(id),
+  email text,
+  blocked boolean DEFAULT false,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "admin_all" ON user_profiles FOR ALL USING (true) WITH CHECK (true);
+
+-- Trigger para auto-crear perfil al registrarse
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.user_profiles(id, email)
+  VALUES (new.id, new.email)
+  ON CONFLICT(id) DO NOTHING;
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();</pre>
+    <p style="color:var(--t2);margin-top:8px">Ejecuta esto en Supabase \u2192 SQL Editor, luego recarga la página.</p>
+  </div>`;
+}
+
+async function toggleUserBlock(userId, blocked){
+  const { error } = await sbClient.from('user_profiles').update({blocked}).eq('id', userId);
+  if(error){ toast('Error al actualizar usuario','err'); return; }
+  toast(blocked ? '🔒 Usuario bloqueado' : '🔓 Usuario desbloqueado', 'ok');
+  loadAdminPanel();
+}
+
 checkAuth(); 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeBankModal();closeCatModal();}});
 </script>
