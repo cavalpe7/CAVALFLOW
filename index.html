@@ -85,7 +85,9 @@ body.unauth .auth-wrap {
 @keyframes spin { 100% {transform:rotate(360deg)} }
 
 /* ══ MOBILE ═══════════════════════════════════════════ */
-.mob-hdr{position:fixed;top:0;left:0;right:0;height:var(--hdr);background:rgba(8,8,15,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--br);display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:100}
+.mob-hdr{position:fixed;top:0;left:0;right:0;background:rgba(8,8,15,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--br);z-index:100;display:flex;flex-direction:column}
+.mob-hdr-row1{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:var(--hdr)}
+#mob-greeting{padding:2px 14px 5px;font-size:12px;font-weight:600;color:var(--t1);display:none}
 .logo-wrap{display:flex;align-items:center;gap:9px}
 .logo-ico{width:32px;height:32px;background:linear-gradient(135deg,var(--violet),var(--violetL));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px}
 .logo-txt{font-size:17px;font-weight:700;letter-spacing:-.3px;background:linear-gradient(135deg,#fff,var(--violetL));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
@@ -94,7 +96,7 @@ body.unauth .auth-wrap {
 .mnav:hover{background:var(--violet);color:#fff;border-color:var(--violet)}
 .mlbl{background:var(--bg3);border:1px solid var(--br);border-radius:var(--rf);padding:5px 11px;color:var(--t1);font-size:11px;font-weight:600}
 
-.main-wrap{padding-top:var(--hdr);padding-bottom:calc(var(--nav)+14px);min-height:100vh;max-width:480px;margin:0 auto;transition:margin-left .3s}
+.main-wrap{padding-top:calc(var(--hdr) + 24px);padding-bottom:calc(var(--nav)+14px);min-height:100vh;max-width:480px;margin:0 auto;transition:margin-left .3s}
 .tab{display:none;padding:14px 13px 0;animation:fadeUp .28s ease}
 .tab.active{display:block}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
@@ -134,7 +136,7 @@ body.unauth .auth-wrap {
   body.sb-collapsed .sb-add{padding:10px;justify-content:center}
   body.sb-collapsed .sb-export{display:none}
   body.sb-collapsed .sb-wa-btn{display:none}
-  body.sb-collapsed .main-wrap{margin-left:60px;width:calc(100% - 60px)}
+  body.sb-collapsed .main-wrap{margin-left:60px!important;width:calc(100% - 60px)!important}
 
   .sb-collapse-btn{position:absolute;top:18px;right:-14px;width:28px;height:28px;background:var(--bg3);border:1px solid var(--br2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--t1);cursor:pointer;z-index:10;transition:all .2s}
   .sb-collapse-btn:hover{background:var(--violet);color:#fff;border-color:var(--violet)}
@@ -162,7 +164,7 @@ body.unauth .auth-wrap {
   .sb-wa-btn:hover{background:rgba(37,211,102,.22)}
   .sb-footer{margin-top:auto;padding-top:14px;font-size:10px;color:var(--t2);text-align:center;line-height:1.5;white-space:nowrap}
 
-  .main-wrap{margin-left:var(--sb-col);width:calc(100% - var(--sb-col));max-width:none;padding:0;padding-bottom:0;min-height:100vh;transition:all .3s}
+  .main-wrap{margin-left:var(--sb-col);width:calc(100% - var(--sb-col));max-width:none;padding:0;padding-bottom:0;min-height:100vh;transition:margin-left .3s,width .3s}
 
   .desk-hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 26px 0;margin-bottom:18px}
   .desk-page-title{font-size:22px;font-weight:700;letter-spacing:-.4px;color:var(--t0)}
@@ -451,6 +453,7 @@ body.unauth .auth-wrap {
 
 <!-- MOBILE HEADER -->
 <header class="mob-hdr">
+  <div class="mob-hdr-row1">
   <div class="logo-wrap"><div class="logo-ico">⚡</div><span class="logo-txt">Caval Flow</span></div>
   <div class="mon-sel">
     <div class="mon-sel" style="margin-right:8px">
@@ -460,6 +463,10 @@ body.unauth .auth-wrap {
     </div>
     <button class="mnav" style="color:var(--redL);border-color:transparent" onclick="handleLogout()" title="Cerrar sesión">🚪</button>
   </div>
+  </div><!-- end mob-hdr-row1 -->
+  <div id="mob-greeting"></div>
+</header>!-- end mob-hdr-row1 -->
+  <div id="mob-greeting"></div>
 </header>
 
 <!-- SIDEBAR -->
@@ -477,6 +484,7 @@ body.unauth .auth-wrap {
     <button class="sb-item"        id="sb-categories" onclick="switchTab('categories')"><span class="si">🏷️</span><span> Categorías</span></button>
     <button class="sb-item"        id="sb-whatsapp"   onclick="switchTab('whatsapp')"><span class="si">💬</span><span> WhatsApp Bot</span></button>
     <button class="sb-item" id="sb-admin-btn" onclick="switchTab('admin')" style="display:none"><span class="si">🛡️</span><span> Admin Panel</span></button>
+    <button class="sb-item" onclick="openTransferModal()"><span class="si">🔄</span><span> Transferencia</span></button>
   </nav>
   <div class="sb-sep"></div>
   <div class="sb-mon-label">Período</div>
@@ -616,6 +624,7 @@ body.unauth .auth-wrap {
 
 <!-- MOBILE BOTTOM NAV -->
 <nav class="mob-nav">
+  <button class="nbtn" onclick="openTransferModal()" style="color:var(--violetL)"><span class="ni">🔄</span><span class="nl">Transfer</span></button>
   <button class="nbtn active" id="nav-dashboard"  onclick="switchTab('dashboard')"><span class="ni">📊</span><span class="nl">Dashboard</span></button>
   <button class="nbtn"        id="nav-history"    onclick="switchTab('history')"><span class="ni">📋</span><span class="nl">Historial</span></button>
   <button class="fab" onclick="openModal()">＋</button>
@@ -651,7 +660,7 @@ body.unauth .auth-wrap {
 </div>
 
 <!-- MODAL: Transferencia -->
-<div class="overlay" id="transferOverlay" style="display:none" onclick="if(event.target===this)closeTransferModal()">
+<div class="overlay" id="transferOverlay" style="display:none;opacity:0;pointer-events:none" onclick="if(event.target===this)closeTransferModal()">
   <div class="modal" id="transferModal">
     <div class="mhandle"></div>
     <p class="mtitle">🔄 Transferencia / Cambio de Divisa</p>
@@ -885,8 +894,7 @@ function renderUserGreeting(){
   const sbFooter=document.querySelector('.sb-footer');
   if(sbFooter) sbFooter.innerHTML='Caval Flow v2.0<br><span style="color:#25d366">● Online</span><br><span style="font-size:11px;color:var(--t1);font-weight:600">'+greet+', '+name+'</span>'+(isAdmin?'<br><span style="color:var(--violetL);font-size:10px">🛡️ Administrador</span>':'');
   let mgEl=document.getElementById('mob-greeting');
-  if(!mgEl){mgEl=document.createElement('div');mgEl.id='mob-greeting';mgEl.style.cssText='padding:3px 14px 5px;font-size:12px;font-weight:600;color:var(--t1);background:var(--bg0);border-bottom:1px solid var(--br)';const hdr=document.querySelector('.mob-hdr');if(hdr)hdr.insertAdjacentElement('afterend',mgEl);}
-  mgEl.innerHTML='👋 '+greet+', <span style="color:var(--violetL)">'+name+'</span>'+(isAdmin?' <span style="background:var(--violetG);color:var(--violetL);padding:1px 7px;border-radius:999px;font-size:10px">🛡️ ADMIN</span>':'');
+  mgEl.style.display='block';mgEl.innerHTML='👋 '+greet+', <span style="color:var(--violetL)">'+name+'</span>'+(isAdmin?' <span style="background:var(--violetG);color:var(--violetL);padding:1px 7px;border-radius:999px;font-size:10px">🛡️ ADMIN</span>':'');
 }
 
 async function handleLogin(){
@@ -1094,7 +1102,7 @@ function updateDeskHdr(){
   const dh=document.getElementById('deskHdr');
   if(dh) dh.innerHTML=`
     <div><div class="desk-page-title">${title}</div><div class="desk-page-sub">${sub}</div></div>
-    <div class="desk-hdr-right">${waBtn}<button class="desk-add-btn" onclick="openModal()">＋ Nuevo Movimiento</button></div>`;
+    <div class="desk-hdr-right">${waBtn}<button class="desk-add-btn" onclick="openTransferModal()" style="background:var(--violetG);border:1px solid var(--violetL);color:var(--violetL);margin-right:8px">🔄 Transferencia</button><button class="desk-add-btn" onclick="openModal()">＋ Nuevo Movimiento</button></div>`;
 }
 
 /* ── MONTH ────────────────────────────────────────────── */
@@ -1868,9 +1876,14 @@ function openTransferModal(){
   document.getElementById('trTo').innerHTML=opts;
   document.getElementById('trDate').value=todayStr();
   ['trAmtFrom','trAmtTo','trRate','trDesc'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('transferOverlay').style.display='flex';
+  const ov=document.getElementById('transferOverlay');
+  ov.style.display='flex'; ov.style.opacity='1'; ov.style.pointerEvents='auto';
 }
-function closeTransferModal(){ document.getElementById('transferOverlay').style.display='none'; }
+function closeTransferModal(){
+  const ov=document.getElementById('transferOverlay');
+  ov.style.opacity='0'; ov.style.pointerEvents='none';
+  setTimeout(()=>{ ov.style.display='none'; },250);
+}
 async function handleTransferSave(){
   const fromId=document.getElementById('trFrom').value;
   const toId=document.getElementById('trTo').value;
