@@ -179,7 +179,7 @@ body.unauth .auth-wrap {
   .chart-single{display:none!important}
   .ch-wrap{position:relative;height:220px}
   .mov-cards{display:none!important}
-  .desk-table-wrap{display:block}
+  .desk-table-wrap{display:block!important}
   .catg{grid-template-columns:repeat(3,1fr)!important}
   .bank-grid{grid-template-columns:repeat(3,1fr)!important}
 }
@@ -603,8 +603,6 @@ body.unauth .auth-wrap {
     <div class="cc"><div class="sh"><span class="sh-title">📖 Comandos disponibles</span></div><div id="waCmdsHelp"></div></div>
     <div style="height:8px"></div>
   </div>
-</div>
-
 
   <!-- ADMIN TAB -->
   <div class="tab" id="tab-admin">
@@ -613,6 +611,7 @@ body.unauth .auth-wrap {
     <div id="adminUsersWrap" style="display:grid;gap:10px"><p style="color:var(--t2)">Cargando...</p></div>
     <div style="height:8px"></div>
   </div>
+</div>
 
 <!-- MOBILE BOTTOM NAV -->
 <nav class="mob-nav">
@@ -870,7 +869,7 @@ function handleSession(session) {
   } else {
     S.currentUser = null;
     document.body.classList.add('unauth');
-    S.movs=[]; S.cats=[]; S.banks=[]; S.tab='dashboard';
+    S.movs=[]; S.cats=[]; S.banks=[]; switchTab('dashboard');
   }
 }
 
@@ -972,25 +971,22 @@ async function runLocalStorageMigration() {
     const localData = JSON.parse(localStr);
     if(localData && !localData.migrated_supabase) {
         toast('Migrando data antigua a la nube...', 'ok');
-        const { data: _sess } = await sbClient.auth.getSession();
-        const userId = _sess?.session?.user?.id;
-        if(!userId) { console.warn('Migration skipped: no user session'); return; }
         
         if(localData.cats && localData.cats.length) {
-            const dbCats = localData.cats.map(c=>({...c, budget: c.budget||0, created_at: c.createdAt || Date.now(), user_id: userId}));
+            const dbCats = localData.cats.map(c=>({...c, budget: c.budget||0, created_at: c.createdAt || Date.now(), user_id: S.currentUser?.id}));
             await sbClient.from('categorias').upsert(dbCats);
         }
         if(localData.banks && localData.banks.length) {
             const dbBanks = localData.banks.map(b=>({
-                ...b, balance: b.balance||0,
+                ...b, balance: b.balance||0, 
                 wallets: Array.isArray(b.wallets) ? b.wallets : [],
                 created_at: b.createdAt || Date.now(),
-                user_id: userId
+                user_id: S.currentUser?.id
             }));
             await sbClient.from('bancos').upsert(dbBanks);
         }
         if(localData.movs && localData.movs.length) {
-            const dbMovs = localData.movs.map(m => mapMovToDB({...m, user_id: m.user_id || userId}));
+            const dbMovs = localData.movs.map(m => { const dbM = mapMovToDB(m); dbM.user_id = S.currentUser?.id; return dbM; });
             await sbClient.from('movimientos').upsert(dbMovs);
         }
         localData.migrated_supabase = true;
@@ -1005,19 +1001,17 @@ async function runLocalStorageMigration() {
 async function load(){
   try{
     toggleLoader(true);
-
-    // Grab user id before migration (migration also reads it, but we need it for default seeding)
-    const { data: _s } = await sbClient.auth.getSession();
-    const userId = _s?.session?.user?.id;
-
-    // Migrate old localStorage data (adds user_id to all records)
+    
+    // First run migration if needed
     await runLocalStorageMigration();
 
-    // RLS in Supabase automatically filters rows by auth.uid() — no manual .eq needed
+    const userId = S.currentUser?.id;
+    if (!userId) { toggleLoader(false); return; }
+
     const [movsRes, catsRes, banksRes] = await Promise.all([
-      sbClient.from('movimientos').select('*').order('date', {ascending: false}),
-      sbClient.from('categorias').select('*').order('created_at', {ascending: true}),
-      sbClient.from('bancos').select('*').order('created_at', {ascending: true})
+      sbClient.from('movimientos').select('*').eq('user_id', userId),
+      sbClient.from('categorias').select('*').eq('user_id', userId),
+      sbClient.from('bancos').select('*').eq('user_id', userId)
     ]);
     
     if(movsRes.error) throw movsRes.error;
@@ -1033,12 +1027,12 @@ async function load(){
        return {...b, balance: parseFloat(b.balance || 0), wallets: pw};
     });
 
-    // Seed defaults for brand-new users — tagged with their user_id so RLS passes
-    if(S.cats.length === 0 && userId) {
+    // Fallback if DB perfectly empty and we didn't just migrate
+    if(S.cats.length === 0) {
       S.cats = DEFAULT_CATS.map(c=>({...c, created_at: Date.now(), user_id: userId}));
       await sbClient.from('categorias').insert(S.cats);
     }
-    if(S.banks.length === 0 && userId) {
+    if(S.banks.length === 0) {
       S.banks = DEFAULT_BANKS.map(b=>({...b, created_at: Date.now(), user_id: userId}));
       await sbClient.from('bancos').insert(S.banks);
     }
@@ -1188,7 +1182,7 @@ function renderCharts(){
 
   const barCfg=(id,key)=>{
     const cvs=document.getElementById(id);if(!cvs)return;
-    if(S.charts[key])S.charts[key].destroy();
+    if(S.charts[key]){S.charts[key].destroy();S.charts[key]=null;}
     S.charts[key]=new Chart(cvs.getContext('2d'),{
       type:'bar',data:{labels,datasets:[
         {label:'Ingresos',data:incData,backgroundColor:'rgba(0,212,170,.72)',borderRadius:7,borderSkipped:false},
@@ -1202,8 +1196,9 @@ function renderCharts(){
     });
   };
   const donutCfg=(id,key)=>{
-    const cvs=document.getElementById(id);if(!cvs||!cs.length)return;
-    if(S.charts[key])S.charts[key].destroy();
+    const cvs=document.getElementById(id);if(!cvs)return;
+    if(S.charts[key]){S.charts[key].destroy();S.charts[key]=null;}
+    if(!cs.length)return;
     S.charts[key]=new Chart(cvs.getContext('2d'),{
       type:'doughnut',
       data:{labels:cs.map(s=>catById(s.id)?.name||s.id),datasets:[{data:cs.map(s=>s.amount),backgroundColor:cs.map(s=>catById(s.id)?.color||'#94a3b8'),borderWidth:2,borderColor:'#131325',hoverOffset:7}]},
@@ -1253,7 +1248,8 @@ function applyF(){
   S.fBank=document.getElementById('bFlt')?.value||'all';
   S.fCur=document.getElementById('curFlt')?.value||'all';
   
-  let movs=[...(S.movs||[])].filter(m=>m.date&&m.date.startsWith(S.mon));
+  // Mostrar TODOS los movimientos en el historial
+  let movs=[...(S.movs||[])].filter(m=>m.date);
   if(S.fType!=='all') movs=movs.filter(m=>m.type===S.fType);
   if(S.fCat !=='all') movs=movs.filter(m=>m.categoryId===S.fCat);
   if(S.fBank!=='all') movs=movs.filter(m=>m.bankId===S.fBank);
@@ -1339,8 +1335,9 @@ function renderBanks(){
   // Bank chart (PEN only)
   const bStats=bankStats(S.mon,'expense','PEN');
   const cvs=document.getElementById('cBank');
-  if(cvs&&bStats.length){
-    if(S.charts.bk)S.charts.bk.destroy();
+  if(cvs){
+    if(S.charts.bk){S.charts.bk.destroy();S.charts.bk=null;}
+    if(bStats.length){
     S.charts.bk=new Chart(cvs.getContext('2d'),{
       type:'bar',
       data:{labels:bStats.map(s=>bankById(s.id)?.name||s.id),datasets:[{data:bStats.map(s=>s.amount),backgroundColor:bStats.map(s=>bankById(s.id)?.color||'#94a3b8'),borderRadius:8,borderSkipped:false}]},
@@ -1349,6 +1346,7 @@ function renderBanks(){
         scales:{x:{ticks:{color:'#60607a',font:{family:'Space Grotesk',size:11}},grid:{display:false}},
                 y:{ticks:{color:'#60607a',font:{family:'Space Grotesk',size:11},callback:v=>`S/ ${fmtNum(v)}`},grid:{color:'rgba(255,255,255,.04)'}}}}
     });
+    }
   }
 }
 
@@ -1685,20 +1683,18 @@ async function handleBankSave(){
   const icon=document.getElementById('bankIconInp').value.trim()||'🏦';
   const balance=parseFloat(document.getElementById('bankBalanceInp').value)||0;
   if(!name){toast('Escribe el nombre del banco','err');return;}
-
-  const { data: _sb } = await sbClient.auth.getSession();
-  const userId = _sb?.session?.user?.id;
-  if(!userId){ toast('Sesión expirada','err'); return; }
-
+  
   const isNew = !S.bankEditId;
   const id=S.bankEditId||uid();
-  const data={id, name,icon,color:S.bankColor,type:S.bankType,currency:S.bankCurrency,wallets:S.bankWallets,balance,created_at:Date.now(),user_id:userId};
+  const userId = S.currentUser?.id;
+  if(!userId) { toast('Sesión expirada','err'); return; }
+  const data={id, name,icon,color:S.bankColor,type:S.bankType,currency:S.bankCurrency,wallets:S.bankWallets,balance,created_at:Date.now(), user_id: userId};
   
   toggleLoader(true);
   const {error} = await sbClient.from('bancos').upsert([data]);
   toggleLoader(false);
 
-  if(error) {toast('Error al guardar banco: '+error.message,'err'); console.error(error); return;}
+  if(error) {toast('Error al guardar en DB. ¿RLS configurado bien?','err'); console.error(error); return;}
 
   if(isNew){
     S.banks.push(data);
@@ -1754,20 +1750,18 @@ async function handleCatSave(){
   const budget=parseFloat(document.getElementById('catBudgetInp').value)||0;
   if(!icon){toast('Agrega un emoji','err');return;}
   if(!name){toast('Escribe un nombre','err');return;}
-
-  const { data: _sc } = await sbClient.auth.getSession();
-  const userId = _sc?.session?.user?.id;
-  if(!userId){ toast('Sesión expirada','err'); return; }
   
   const isNew = !S.catEditId;
   const id=S.catEditId||uid();
-  const data={id,icon,name,color:S.catColor,type:S.catType,budget,created_at:Date.now(),user_id:userId};
+  const userId = S.currentUser?.id;
+  if(!userId) { toast('Sesión expirada','err'); return; }
+  const data={id,icon,name,color:S.catColor,type:S.catType,budget,created_at:Date.now(), user_id: userId};
   
   toggleLoader(true);
   const {error} = await sbClient.from('categorias').upsert([data]);
   toggleLoader(false);
   
-  if(error) {toast('Error al guardar categoría: '+error.message,'err'); console.error(error); return;}
+  if(error) {toast('Error al guardar. ¿RLS configurado bien?','err'); return;}
 
   if(isNew){
     S.cats.push(data);
@@ -1795,8 +1789,10 @@ async function deleteCat(id){
 function openCtx(e,id){
   e.stopPropagation();S.ctxId=id;
   const menu=document.getElementById('ctx');
-  menu.style.top=`${Math.min(e.clientY+window.scrollY,document.body.scrollHeight-110)}px`;
-  menu.style.right='14px';menu.classList.add('open');
+  menu.style.top=`${Math.min(e.clientY,window.innerHeight-110)}px`;
+  menu.style.left=`${Math.min(e.clientX,window.innerWidth-160)}px`;
+  menu.style.right='auto';
+  menu.classList.add('open');
   setTimeout(()=>document.addEventListener('click',closeCtx,{once:true}),10);
 }
 function closeCtx(){document.getElementById('ctx').classList.remove('open');}
@@ -1865,7 +1861,16 @@ function fmt(n,cur='PEN'){
   const sym=cur==='USD'?'US$':'S/';
   return`${sym} ${fmtNum(n)}`;
 }
-function fmtDate(s){if(!s)return'';const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('es-PE',{day:'numeric',month:'short'});}
+function fmtDate(s){
+  if(!s)return'';
+  try{
+    let d;
+    if(typeof s==='number'||!String(s).includes('-')){d=new Date(s);}
+    else{const[y,m,day]=String(s).split('-').map(Number);d=new Date(y,m-1,day);}
+    if(isNaN(d.getTime())) return String(s);
+    return d.toLocaleDateString('es-PE',{day:'numeric',month:'short'});
+  }catch(e){return String(s);}
+}
 function cap(s){return s?s[0].toUpperCase()+s.slice(1):s;}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 function nowYM(){return new Date().toISOString().slice(0,7);}
@@ -1945,7 +1950,10 @@ function adminSetupSQL(){
   created_at timestamptz DEFAULT now()
 );
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "perfiles_all" ON user_profiles FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "perfiles_all" ON user_profiles;
+DROP POLICY IF EXISTS "perfiles_self" ON user_profiles;
+CREATE POLICY "perfiles_admin_y_self" ON user_profiles FOR ALL 
+USING ( auth.jwt() ->> 'email' = 'nelsonjvr92@gmail.com' OR id = auth.uid() );
 
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$ BEGIN
