@@ -294,6 +294,40 @@ body.unauth .auth-wrap {
 .cat-btn{flex:1;padding:5px;border-radius:var(--rs);border:1px solid var(--br);background:var(--bg3);color:var(--t1);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:4px;transition:all .2s}
 .cat-btn:hover{background:var(--bg4);color:var(--t0)}
 .cat-btn.danger:hover{background:rgba(255,77,109,.15);color:var(--redL);border-color:var(--redL)}
+.cat-btn.detail{border-color:rgba(124,58,237,.3);color:var(--violetL)}
+.cat-btn.detail:hover{background:var(--violetG);color:var(--violetL);border-color:var(--violetL)}
+
+/* ══ CATEGORY DETAIL OVERLAY ══════════════════════════ */
+.catdet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);z-index:500;display:none;align-items:flex-end;justify-content:center}
+.catdet-overlay.open{display:flex}
+@media(min-width:768px){.catdet-overlay{align-items:center}}
+.catdet-panel{background:var(--bg1);border:1px solid var(--br2);border-radius:22px 22px 0 0;width:100%;max-width:640px;max-height:88vh;overflow-y:auto;padding:20px 18px 30px;animation:slideUp .3s ease}
+@media(min-width:768px){.catdet-panel{border-radius:22px;max-height:82vh}}
+@keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}
+.catdet-handle{width:38px;height:4px;background:var(--br2);border-radius:2px;margin:0 auto 16px}
+.catdet-head{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.catdet-ico{width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0}
+.catdet-title{font-size:20px;font-weight:700;font-family:var(--font-head);letter-spacing:-.3px}
+.catdet-sub{font-size:12px;color:var(--t2);margin-top:2px}
+.catdet-close{margin-left:auto;width:32px;height:32px;background:var(--bg3);border:1px solid var(--br);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;flex-shrink:0;transition:all .2s}
+.catdet-close:hover{background:var(--redG);border-color:var(--red);color:var(--redL)}
+.catdet-month-row{display:grid;gap:8px;margin-bottom:18px}
+.catdet-mcard{background:var(--bg2);border:1px solid var(--br);border-radius:var(--r);padding:13px 14px;cursor:pointer;transition:border-color .2s,background .2s}
+.catdet-mcard:hover{background:var(--bg3);border-color:var(--br2)}
+.catdet-mcard.sel{border-color:var(--violetL);background:var(--violetG)}
+.catdet-mcard-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.catdet-mname{font-size:13px;font-weight:700;font-family:var(--font-head);text-transform:capitalize}
+.catdet-mamt{font-size:15px;font-weight:700;font-family:var(--font-head);color:var(--redL)}
+.catdet-mamt.inc{color:var(--greenL)}
+.catdet-mbar{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.catdet-mbar-f{height:100%;border-radius:3px;transition:width .5s ease}
+.catdet-movs{display:flex;flex-direction:column;gap:6px;margin-top:4px}
+.catdet-ch{position:relative;height:180px;margin-bottom:18px}
+.catdet-section-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--t2);font-family:var(--font-head);margin-bottom:10px}
+.catdet-total-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px}
+.catdet-total-box{background:var(--bg2);border:1px solid var(--br);border-radius:var(--rs);padding:10px 12px;text-align:center}
+.catdet-total-lbl{font-size:9px;color:var(--t2);font-weight:700;text-transform:uppercase;letter-spacing:.8px;font-family:var(--font-head);margin-bottom:3px}
+.catdet-total-val{font-size:16px;font-weight:700;font-family:var(--font-head)}
 
 /* ══ BANKS ════════════════════════════════════════════ */
 .bank-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
@@ -669,7 +703,29 @@ body.unauth .auth-wrap {
   </div>
 </div>
 
-<!-- MODAL: Banco -->
+<!-- MODAL: Category Detail -->
+<div class="catdet-overlay" id="catDetOverlay" onclick="if(event.target===this)closeCatDetail()">
+  <div class="catdet-panel" id="catDetPanel">
+    <div class="catdet-handle"></div>
+    <div class="catdet-head">
+      <div class="catdet-ico" id="catDetIco"></div>
+      <div>
+        <div class="catdet-title" id="catDetTitle"></div>
+        <div class="catdet-sub" id="catDetSub"></div>
+      </div>
+      <button class="catdet-close" onclick="closeCatDetail()">✕</button>
+    </div>
+    <!-- Totales globales -->
+    <div class="catdet-total-row" id="catDetTotals"></div>
+    <!-- Gráfico barras -->
+    <div class="catdet-section-lbl">📈 Evolución — Últimos 12 meses</div>
+    <div class="catdet-ch"><canvas id="catDetChart"></canvas></div>
+    <!-- Meses expandibles -->
+    <div class="catdet-section-lbl" style="margin-top:8px">📅 Mes a mes</div>
+    <div class="catdet-month-row" id="catDetMonths"></div>
+  </div>
+</div>
+
 <div class="overlay" id="bankOverlay" onclick="bankOverlayClick(event)">
   <div class="modal" id="bankModal">
     <div class="mhandle"></div>
@@ -1375,6 +1431,7 @@ function renderCats(){
             </div>
             ${budget>0?`<div class="bbar-wrap"><div class="bbar-labels"><span style="color:${barClass==='over'?'var(--redL)':barClass==='mid'?'var(--yellow)':'var(--greenL)'}">${pctBar}%</span><span>Limit: ${fmt(budget,'PEN')}</span></div><div class="bbar"><div class="bbar-f ${barClass}" style="width:${pctBar}%"></div></div></div>`:''}
             <div class="catcard-actions">
+              <button class="cat-btn detail" onclick="openCatDetail('${c.id}')">📊 Ver detalle</button>
               <button class="cat-btn" onclick="openCatModal('${c.id}')">✏️ Editar</button>
               <button class="cat-btn danger" onclick="deleteCat('${c.id}')">🗑️ Borrar</button>
             </div>
@@ -1975,8 +2032,188 @@ async function toggleUserBlock(userId,blocked){
   loadAdminPanel();
 }
 
+/* ── CATEGORY DETAIL ──────────────────────────────────── */
+let catDetChart=null;
+let catDetOpenMonth=null;
+
+function last12Months(){
+  const now=new Date();
+  return Array.from({length:12},(_,i)=>{
+    const d=new Date(now.getFullYear(),now.getMonth()-11+i,1);
+    return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  });
+}
+
+function openCatDetail(catId){
+  const cat=catById(catId);
+  if(!cat||cat.id==='transfer')return;
+  catDetOpenMonth=null;
+
+  // Header
+  const ico=document.getElementById('catDetIco');
+  const title=document.getElementById('catDetTitle');
+  const sub=document.getElementById('catDetSub');
+  ico.textContent=cat.icon;
+  ico.style.background=cat.color+'22';
+  title.textContent=cat.name;
+
+  const months=last12Months();
+  const movsByCat=(S.movs||[]).filter(m=>m.categoryId===catId&&m.date);
+
+  // Per-month amounts
+  const monthData=months.map(mon=>{
+    const [y,m]=mon.split('-').map(Number);
+    const movs=movsByCat.filter(mv=>{
+      const d=new Date(mv.date+'T00:00:00');
+      return d.getFullYear()===y&&d.getMonth()+1===m;
+    });
+    const total=movs.reduce((s,mv)=>s+(parseFloat(mv.amount)||0),0);
+    return{mon,movs,total};
+  });
+
+  // Global stats
+  const totalAll=monthData.reduce((s,d)=>s+d.total,0);
+  const activeMonths=monthData.filter(d=>d.total>0).length;
+  const avg=activeMonths>0?totalAll/activeMonths:0;
+  const maxMon=monthData.reduce((a,b)=>b.total>a.total?b:a,{total:0});
+
+  const type=cat.type||'expense';
+  const amtColor=type==='income'?'var(--greenL)':'var(--redL)';
+  sub.textContent=`${type==='income'?'Ingresos':'Gastos'} · ${activeMonths} mes${activeMonths!==1?'es':''} activo${activeMonths!==1?'s':''}`;
+
+  // Totals row
+  const totDiv=document.getElementById('catDetTotals');
+  totDiv.innerHTML=`
+    <div class="catdet-total-box">
+      <div class="catdet-total-lbl">Total 12m</div>
+      <div class="catdet-total-val" style="color:${amtColor}">${fmt(totalAll,'PEN')}</div>
+    </div>
+    <div class="catdet-total-box">
+      <div class="catdet-total-lbl">Promedio/mes</div>
+      <div class="catdet-total-val" style="color:var(--t1)">${fmt(avg,'PEN')}</div>
+    </div>
+    <div class="catdet-total-box">
+      <div class="catdet-total-lbl">Mes pico</div>
+      <div class="catdet-total-val" style="color:var(--yellow);font-size:13px">${maxMon.total>0?formatMonLabel(maxMon.mon):'—'}</div>
+    </div>`;
+
+  // Chart
+  const cvs=document.getElementById('catDetChart');
+  if(catDetChart){catDetChart.destroy();catDetChart=null;}
+  const maxVal=Math.max(...monthData.map(d=>d.total),1);
+  catDetChart=new Chart(cvs.getContext('2d'),{
+    type:'bar',
+    data:{
+      labels:monthData.map(d=>formatMonLabel(d.mon)),
+      datasets:[{
+        data:monthData.map(d=>d.total),
+        backgroundColor:monthData.map(d=>d.total>0?cat.color+'bb':'rgba(255,255,255,.06)'),
+        borderRadius:7,borderSkipped:false,
+        hoverBackgroundColor:cat.color
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#131325',borderColor:'rgba(255,255,255,.07)',borderWidth:1,
+          titleColor:'#f2f2ff',bodyColor:'#9898b8',
+          callbacks:{label:c=>` ${fmt(c.parsed.y,'PEN')}`}
+        }
+      },
+      scales:{
+        x:{ticks:{color:'#60607a',font:{family:'Space Grotesk',size:10}},grid:{display:false}},
+        y:{ticks:{color:'#60607a',font:{family:'Space Grotesk',size:10},callback:v=>v===0?'0':`S/${fmtNum(v)}`},grid:{color:'rgba(255,255,255,.04)'}}
+      },
+      onClick:(e,els)=>{
+        if(els.length){const idx=els[0].index;toggleCatDetMonth(idx,monthData,cat);}
+      }
+    }
+  });
+
+  // Month list
+  renderCatDetMonths(monthData,cat);
+
+  // Show overlay
+  document.getElementById('catDetOverlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+
+function formatMonLabel(mon){
+  const[y,m]=mon.split('-').map(Number);
+  const d=new Date(y,m-1,1);
+  return d.toLocaleDateString('es-PE',{month:'short',year:'2-digit'}).replace('. ',' \'');
+}
+
+function formatMonFull(mon){
+  const[y,m]=mon.split('-').map(Number);
+  const d=new Date(y,m-1,1);
+  return d.toLocaleDateString('es-PE',{month:'long',year:'numeric'});
+}
+
+function toggleCatDetMonth(idx,monthData,cat){
+  const entry=monthData[idx];
+  catDetOpenMonth=catDetOpenMonth===entry.mon?null:entry.mon;
+  renderCatDetMonths(monthData,cat);
+  // Scroll to months section
+  setTimeout(()=>{
+    const selEl=document.querySelector('.catdet-mcard.sel');
+    if(selEl)selEl.scrollIntoView({behavior:'smooth',block:'nearest'});
+  },80);
+}
+
+function renderCatDetMonths(monthData,cat){
+  const type=cat.type||'expense';
+  const amtColor=type==='income'?'var(--greenL)':'var(--redL)';
+  const maxVal=Math.max(...monthData.map(d=>d.total),1);
+  const wrap=document.getElementById('catDetMonths');
+  // Show months with activity first, then the rest — reversed (most recent first)
+  const sorted=[...monthData].reverse();
+  wrap.innerHTML=sorted.map(entry=>{
+    const pct=Math.round(entry.total/maxVal*100);
+    const isSel=catDetOpenMonth===entry.mon;
+    const movsHTML=isSel&&entry.movs.length?`
+      <div class="catdet-movs" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--br)">
+        ${[...entry.movs].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(mv=>{
+          const b=bankById(mv.bankId);const cur=mv.currency||'PEN';
+          return`<div class="mov ${mv.type}" onclick="openCtx(event,'${mv.id}')" style="border-radius:var(--rs)">
+            <div class="mov-ico" style="background:${cat.color}22;width:32px;height:32px;font-size:15px">${cat.icon}</div>
+            <div class="mov-info">
+              <div class="mov-desc" style="font-size:12px">${mv.description||cat.name}</div>
+              <div class="mov-meta">
+                ${b?`<span class="mov-bank-tag" style="color:${b.color}">${b.icon} ${b.name}</span><span class="dot"></span>`:''}
+                <span>${fmtDate(mv.date)}</span>
+              </div>
+            </div>
+            <div class="mov-amt ${mv.type}" style="font-size:13px">${mv.type==='income'?'+':'-'}${fmt(mv.amount,cur)}</div>
+          </div>`;
+        }).join('')}
+      </div>`:
+      isSel&&!entry.movs.length?`<div style="padding:10px 0 2px;font-size:12px;color:var(--t2)">Sin movimientos este mes.</div>`:'';
+    return`<div class="catdet-mcard${isSel?' sel':''}" onclick="catDetOpenMonth=catDetOpenMonth==='${entry.mon}'?null:'${entry.mon}';renderCatDetMonths(window._catDetData,window._catDetCat)">
+      <div class="catdet-mcard-top">
+        <span class="catdet-mname">${formatMonFull(entry.mon)}</span>
+        <span class="catdet-mamt${type==='income'?' inc':''}">${entry.total>0?(type==='income'?'+':'-')+fmt(entry.total,'PEN'):'—'}</span>
+      </div>
+      ${entry.total>0?`<div class="catdet-mbar"><div class="catdet-mbar-f" style="width:${pct}%;background:${cat.color}"></div></div>`:'<div style="height:5px;background:var(--bg3);border-radius:3px"></div>'}
+      ${entry.movs.length&&!isSel?`<div style="font-size:10px;color:var(--t2);margin-top:4px">${entry.movs.length} movimiento${entry.movs.length!==1?'s':''} · toca para ver</div>`:''}
+      ${movsHTML}
+    </div>`;
+  }).join('');
+  // Store refs for re-render from inline onclick
+  window._catDetData=monthData;window._catDetCat=cat;
+}
+
+function closeCatDetail(){
+  document.getElementById('catDetOverlay').classList.remove('open');
+  document.body.style.overflow='';
+  catDetOpenMonth=null;
+  if(catDetChart){catDetChart.destroy();catDetChart=null;}
+}
+
 checkAuth(); 
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeBankModal();closeCatModal();}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeBankModal();closeCatModal();closeCatDetail();}});
 </script>
 </body>
 </html>
