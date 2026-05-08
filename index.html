@@ -725,7 +725,7 @@ body.unauth .auth-wrap {
     <div class="catdet-month-row" id="catDetMonths"></div>
   </div>
 </div>
-
+<!-- BANK MODAL -->
 <div class="overlay" id="bankOverlay" onclick="bankOverlayClick(event)">
   <div class="modal" id="bankModal">
     <div class="mhandle"></div>
@@ -2214,6 +2214,477 @@ function closeCatDetail(){
 
 checkAuth(); 
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeBankModal();closeCatModal();closeCatDetail();}});
+</script>
+
+<!-- ═══════════════════════════════════════════════════════
+     PATCH v3 — Mejoras: session timeout · TDC negativo ·
+     nuevas categorías · dashboard mensual · creditcard type
+     ═══════════════════════════════════════════════════════ -->
+<style>
+/* Session warning overlay */
+.sw-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(10px);
+  z-index:9800;display:flex;align-items:center;justify-content:center;padding:20px;
+  opacity:0;pointer-events:none;transition:opacity .3s}
+.sw-overlay.open{opacity:1;pointer-events:all}
+.sw-box{background:#0d0d1a;border:2px solid #fbbf24;border-radius:20px;padding:32px 28px;
+  max-width:340px;width:100%;text-align:center;
+  box-shadow:0 0 0 0 rgba(251,191,36,.4);animation:swPulse 2s ease infinite}
+@keyframes swPulse{0%,100%{box-shadow:0 0 0 0 rgba(251,191,36,.3)}
+  50%{box-shadow:0 0 0 10px rgba(251,191,36,0)}}
+.sw-icon{font-size:44px;margin-bottom:10px}
+.sw-title{font-size:20px;font-weight:700;color:#fbbf24;margin-bottom:6px;font-family:'Space Grotesk',sans-serif}
+.sw-sub{font-size:13px;color:#b0b0d0;margin-bottom:4px}
+.sw-count{font-size:40px;font-weight:700;color:#fbbf24;margin:10px 0;font-family:'Space Grotesk',sans-serif}
+.sw-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.sw-btn-stay{background:linear-gradient(135deg,#7c3aed,#a066f5);border:none;border-radius:10px;
+  color:#fff;padding:12px;font-size:14px;font-weight:700;cursor:pointer;transition:all .2s}
+.sw-btn-stay:hover{transform:translateY(-1px)}
+.sw-btn-out{background:transparent;border:1px solid rgba(255,255,255,.2);border-radius:10px;
+  color:#b0b0d0;padding:12px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s}
+.sw-btn-out:hover{border-color:#ff4d6d;color:#ff7690}
+
+/* Monthly strip */
+.month-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+@media(max-width:480px){.month-strip{grid-template-columns:repeat(2,1fr)}}
+.ms-card{background:#131325;border:1px solid rgba(255,255,255,.07);border-radius:12px;
+  padding:11px 9px;text-align:center;position:relative;overflow:hidden}
+.ms-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.ms-card.inc::before{background:linear-gradient(90deg,#00d4aa,#00f5c4)}
+.ms-card.exp::before{background:linear-gradient(90deg,#ff4d6d,#ff7690)}
+.ms-card.sav::before{background:linear-gradient(90deg,#06c5e0,#38e0f5)}
+.ms-card.dbt::before{background:linear-gradient(90deg,#fbbf24,#f97316)}
+.ms-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
+  color:#60607a;margin-bottom:4px;font-family:'Space Grotesk',sans-serif}
+.ms-val{font-size:13px;font-weight:700;font-family:'Space Grotesk',sans-serif;letter-spacing:-.3px}
+.ms-val.inc{color:#00f5c4}.ms-val.exp{color:#ff7690}
+.ms-val.sav{color:#38e0f5}.ms-val.dbt{color:#fbbf24}
+
+/* Financial health */
+.fin-health{display:flex;align-items:center;gap:9px;padding:10px 14px;
+  border-radius:9px;font-size:12px;font-weight:700;margin-bottom:12px;border:1px solid}
+.fin-health.good{background:rgba(0,212,170,.08);border-color:rgba(0,212,170,.25);color:#00f5c4}
+.fin-health.warn{background:rgba(251,191,36,.08);border-color:rgba(251,191,36,.25);color:#fbbf24}
+.fin-health.bad{background:rgba(255,77,109,.08);border-color:rgba(255,77,109,.25);color:#ff7690}
+
+/* Credit card extra fields */
+.cc-extra{display:none;margin-top:8px;padding:10px;background:rgba(124,58,237,.08);
+  border:1px dashed rgba(124,58,237,.3);border-radius:9px}
+.cc-extra.show{display:block}
+.cc-note{font-size:11px;color:#60607a;margin-top:6px;line-height:1.5}
+</style>
+
+<!-- Session Warning Modal -->
+<div class="sw-overlay" id="swOverlay">
+  <div class="sw-box">
+    <div class="sw-icon">⏰</div>
+    <div class="sw-title">Sesión por expirar</div>
+    <div class="sw-sub">Por inactividad, tu sesión se cerrará en</div>
+    <div class="sw-count" id="swCount">120</div>
+    <div style="font-size:11px;color:#60607a">segundos</div>
+    <div class="sw-btns">
+      <button class="sw-btn-out" onclick="p3Logout()">🚪 Salir</button>
+      <button class="sw-btn-stay" onclick="p3Extend()">✔ Continuar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   PATCH v3 — runs AFTER main script
+   ═══════════════════════════════════════════════════ */
+
+/* ── 1. SESSION TIMEOUT (15 min / warning at 13 min) ── */
+const P3_TIMEOUT   = 15 * 60 * 1000;
+const P3_WARN_AT   = 13 * 60 * 1000;
+const P3_ACT_EVT   = ['mousemove','keydown','mousedown','touchstart','click','scroll'];
+let p3Timer = null, p3WarnTimer = null, p3Interval = null, p3Secs = 120;
+
+function p3Reset(){
+  clearTimeout(p3Timer); clearTimeout(p3WarnTimer); clearInterval(p3Interval);
+  document.getElementById('swOverlay').classList.remove('open');
+  if(!S || !S.currentUser) return;
+  p3WarnTimer = setTimeout(p3ShowWarn, P3_WARN_AT);
+  p3Timer     = setTimeout(()=>p3Logout(true), P3_TIMEOUT);
+}
+function p3ShowWarn(){
+  p3Secs = 120;
+  document.getElementById('swCount').textContent = p3Secs;
+  document.getElementById('swOverlay').classList.add('open');
+  p3Interval = setInterval(()=>{
+    p3Secs--;
+    document.getElementById('swCount').textContent = p3Secs;
+    if(p3Secs <= 0){ clearInterval(p3Interval); }
+  }, 1000);
+}
+function p3Extend(){ p3Reset(); if(window.toast) toast('✅ Sesión extendida','ok'); }
+async function p3Logout(auto=false){
+  clearTimeout(p3Timer); clearTimeout(p3WarnTimer); clearInterval(p3Interval);
+  document.getElementById('swOverlay').classList.remove('open');
+  P3_ACT_EVT.forEach(e=>document.removeEventListener(e, p3Reset));
+  if(S){ S.movs=[]; S.cats=[]; S.banks=[]; S.currentUser=null; }
+  try{ await sbClient.auth.signOut(); }catch(e){}
+  if(auto && window.toast) toast('⏰ Sesión cerrada por inactividad','ok');
+  // patch handleLogout to avoid double confirm
+  if(!auto && window.confirm('¿Seguro que deseas cerrar sesión?')){
+    // already signed out above
+  }
+}
+function p3StartWatcher(){
+  P3_ACT_EVT.forEach(e=>document.addEventListener(e, p3Reset, {passive:true}));
+  p3Reset();
+}
+function p3StopWatcher(){
+  P3_ACT_EVT.forEach(e=>document.removeEventListener(e, p3Reset));
+  clearTimeout(p3Timer); clearTimeout(p3WarnTimer); clearInterval(p3Interval);
+  document.getElementById('swOverlay').classList.remove('open');
+}
+
+/* ── 2. PATCH handleSession to start/stop watcher ── */
+const _origHandleSession = window.handleSession;
+window.handleSession = function(session){
+  if(typeof _origHandleSession === 'function') _origHandleSession(session);
+  if(session){ p3StartWatcher(); } else { p3StopWatcher(); }
+};
+
+/* ── 3. PATCH handleLogout to also clean up watcher ── */
+const _origLogout = window.handleLogout;
+window.handleLogout = async function(){
+  p3StopWatcher();
+  if(typeof _origLogout === 'function') await _origLogout();
+};
+
+/* ── 4. EXPAND DEFAULT CATEGORIES ── */
+// Only runs for NEW accounts. Existing accounts keep their DB cats.
+const P3_EXTRA_CATS = [
+  {id:'utilities',     name:'Servicios',     icon:'⚡',  color:'#06c5e0',type:'expense',budget:150},
+  {id:'streaming',     name:'Streaming',     icon:'📺',  color:'#ff4d6d',type:'expense',budget:50},
+  {id:'gym',           name:'Gym',           icon:'🏋️', color:'#f97316',type:'expense',budget:80},
+  {id:'travel',        name:'Viajes',        icon:'✈️', color:'#a78bfa',type:'expense',budget:0},
+  {id:'shopping',      name:'Compras',       icon:'🛍️', color:'#ec4899',type:'expense',budget:0},
+  {id:'pets',          name:'Mascotas',      icon:'🐾',  color:'#84cc16',type:'expense',budget:50},
+  {id:'tech',          name:'Tecnología',    icon:'💻',  color:'#7c3aed',type:'expense',budget:0},
+  {id:'subscriptions', name:'Suscripciones', icon:'🔁',  color:'#38bdf8',type:'expense',budget:0},
+  {id:'taxes',         name:'Impuestos',     icon:'📋',  color:'#ef4444',type:'expense',budget:0},
+  {id:'bonus',         name:'Bonos',         icon:'🎁',  color:'#fbbf24',type:'income', budget:0},
+  {id:'business_inc',  name:'Negocio',       icon:'🏪',  color:'#f97316',type:'income', budget:0},
+  {id:'inc_other',     name:'Otros ingresos',icon:'💵',  color:'#84cc16',type:'income', budget:0},
+  {id:'emergency',     name:'Fondo Emerg.',  icon:'🚨',  color:'#ef4444',type:'both',   budget:0},
+];
+
+/* ── 5. PATCH DEFAULT_CATS in main script (rename existing) ── */
+if(window.DEFAULT_CATS){
+  // Rename old "Vivienda" → "Hogar", add new transport icon, etc.
+  const renames = {housing:'Hogar', transport:'Transporte'};
+  const transIcons = {transport:'🚗', housing:'🏠', health:'🏥'};
+  window.DEFAULT_CATS.forEach(c=>{
+    if(renames[c.id]) c.name = renames[c.id];
+    if(transIcons[c.id]) c.icon = transIcons[c.id];
+  });
+  // Add extra cats if not present
+  P3_EXTRA_CATS.forEach(ec=>{
+    if(!window.DEFAULT_CATS.find(c=>c.id===ec.id)) window.DEFAULT_CATS.push(ec);
+  });
+}
+
+/* ── 6. PATCH BANK TYPE: add "creditcard" ── */
+if(window.BANK_TYPE_LABELS){
+  window.BANK_TYPE_LABELS['creditcard'] = 'Tarjeta de Crédito';
+}
+
+/* ── 7. PATCH openBankModal: allow negative balance + credit limit field ── */
+const _origOpenBankModal = window.openBankModal;
+window.openBankModal = function(id=null){
+  // Insert button if not there BEFORE doing UI updates
+  const tRow = document.getElementById('bankTypeRow');
+  if(tRow && !tRow.querySelector('[data-t="creditcard"]')){
+    const btn = document.createElement('button');
+    btn.className='bank-type-btn'; btn.dataset.t='creditcard';
+    btn.textContent='💳 TDC';
+    btn.onclick = ()=>{ window.selBankType(btn,'creditcard'); p3UpdateCCFields(); };
+    tRow.insertBefore(btn, tRow.children[1]);
+  }
+
+  // Call original first (this sets S.bankType and calls selBankTypeUI)
+  if(typeof _origOpenBankModal === 'function') _origOpenBankModal(id);
+
+  // Add credit-limit field if not already there
+  const bModal = document.getElementById('bankModal');
+  if(bModal && !document.getElementById('bankCreditLimitInp')){
+    const ccDiv = document.createElement('div');
+    ccDiv.className='fg cc-extra'; ccDiv.id='ccExtraFields';
+    ccDiv.innerHTML=`
+      <label class="flbl">Línea de crédito total</label>
+      <input type="number" class="finp" id="bankCreditLimitInp" placeholder="Ej: 5000.00" step="0.01" min="0">
+      <div class="cc-note">💡 Para TDC: el saldo utilizado puede ser <strong>negativo</strong> (ej: -1200 = deuda). La línea de crédito es el límite total.</div>`;
+    // Insert before buttons
+    const btnRow = bModal.querySelector('.btn-row');
+    if(btnRow) bModal.insertBefore(ccDiv, btnRow);
+  }
+
+  // Fix balance input: remove min=0 to allow negatives
+  const balInp = document.getElementById('bankBalanceInp');
+  if(balInp) balInp.removeAttribute('min');
+
+  // Load existing data
+  if(id){
+    const bank = (S?.banks||[]).find(b=>b.id===id);
+    if(bank){
+      const balInp2 = document.getElementById('bankBalanceInp');
+      if(balInp2) balInp2.value = (bank.balance !== undefined && bank.balance !== null) ? bank.balance : '';
+      const limInp = document.getElementById('bankCreditLimitInp');
+      if(limInp) limInp.value = bank.credit_limit || '';
+    }
+  }
+
+  // Fix UI based on S.bankType
+  if(window.selBankTypeUI) window.selBankTypeUI(S?.bankType);
+  p3UpdateCCFields(S?.bankType === 'creditcard');
+};
+
+function p3UpdateCCFields(show){
+  const isTDC = show !== undefined ? show : (S?.bankType==='creditcard');
+  const el = document.getElementById('ccExtraFields');
+  const lbl = document.getElementById('bankBalLbl') || document.querySelector('#bankModal .fg:last-of-type label.flbl');
+  const inp = document.getElementById('bankBalanceInp');
+  if(el){ if(isTDC) el.classList.add('show'); else el.classList.remove('show'); }
+  if(inp){ inp.placeholder = isTDC ? '-1200.00 (deuda)' : '0.00'; }
+  if(lbl){ lbl.textContent = isTDC ? 'Saldo utilizado (negativo = deuda)' : 'Saldo inicial'; }
+}
+
+/* ── 8. PATCH selBankType to also update CC fields ── */
+const _origSelBankType = window.selBankType;
+window.selBankType = function(btn, t){
+  if(typeof _origSelBankType === 'function') _origSelBankType(btn, t);
+  p3UpdateCCFields(t==='creditcard');
+};
+
+/* ── 9. PATCH handleBankSave to save credit_limit & allow negative balance ── */
+const _origHandleBankSave = window.handleBankSave;
+window.handleBankSave = async function(){
+  // Fix: allow negative balance before calling original
+  const balInp = document.getElementById('bankBalanceInp');
+  const rawVal = balInp ? balInp.value : '';
+  // Temporarily patch parseFloat-based validation by ensuring min is removed
+  if(balInp) balInp.removeAttribute('min');
+
+  // We'll intercept by replacing handleBankSave temporarily
+  // Instead, let's just call the save directly
+  const name = document.getElementById('bankNameInp')?.value?.trim();
+  const icon = document.getElementById('bankIconInp')?.value?.trim()||'🏦';
+  const balance = rawVal !== '' ? parseFloat(rawVal) : 0;
+  const credit_limit = parseFloat(document.getElementById('bankCreditLimitInp')?.value||0)||0;
+
+  if(!name){ if(window.toast) toast('Escribe el nombre del banco','err'); return; }
+  if(isNaN(balance)){ if(window.toast) toast('Ingresa un saldo inicial válido','err'); return; }
+
+  const isNew = !S?.bankEditId;
+  const id = S?.bankEditId || (Date.now().toString(36)+Math.random().toString(36).slice(2));
+  const userId = S?.currentUser?.id;
+  if(!userId){ if(window.toast) toast('Sesión expirada','err'); return; }
+
+  const data = {
+    id, name, icon,
+    color: S?.bankColor||'#ef4444',
+    type: S?.bankType||'bank',
+    currency: S?.bankCurrency||'PEN',
+    wallets: S?.bankWallets||[],
+    balance, credit_limit,
+    created_at: Date.now(), user_id: userId
+  };
+
+  if(window.toggleLoader) toggleLoader(true);
+  let {error} = await sbClient.from('bancos').upsert([data]);
+  
+  // FALLBACK: Si falla porque no existe credit_limit, intenta guardarlo sin ese campo
+  if(error && error.message && error.message.includes('credit_limit')){
+    const dataFallback = {...data};
+    delete dataFallback.credit_limit;
+    const fallbackRes = await sbClient.from('bancos').upsert([dataFallback]);
+    error = fallbackRes.error;
+    if(!error && window.toast) toast('⚠️ Guardado, pero falta actualizar Supabase (credit_limit)','err');
+  }
+
+  if(window.toggleLoader) toggleLoader(false);
+
+  if(error){ 
+    if(window.toast) toast('BD Error: ' + (error.message||'Desconocido'),'err'); 
+    console.error('SUPABASE ERROR:', error); 
+    return; 
+  }
+
+  if(isNew){ S.banks.push(data); }
+  else{
+    const i = S.banks.findIndex(b=>b.id===S.bankEditId);
+    if(i>=0) S.banks[i]={...S.banks[i],...data};
+  }
+  if(window.toast) toast(isNew?'✅ Banco agregado':'✅ Banco actualizado','ok');
+  if(window.closeBankModal) closeBankModal();
+  if(window.render) render();
+};
+
+/* ── 10. PATCH load() to preserve negative balances from DB ── */
+const _origLoad = window.load;
+window.load = async function(){
+  await _origLoad();
+  // Re-parse banks preserving negative balances (original uses parseFloat(b.balance||0))
+  if(S?.banks){
+    // Already loaded, just fix any that were incorrectly set to 0
+    // Actually we need to re-fetch. Let's patch the map after load.
+    const userId = S?.currentUser?.id;
+    if(!userId) return;
+    try{
+      const {data} = await sbClient.from('bancos').select('balance,credit_limit,id').eq('user_id',userId);
+      if(data) data.forEach(row=>{
+        const b = S.banks.find(x=>x.id===row.id);
+        if(b){
+          b.balance = (row.balance !== null && row.balance !== undefined) ? parseFloat(row.balance) : 0;
+          b.credit_limit = parseFloat(row.credit_limit||0);
+        }
+      });
+    }catch(e){}
+  }
+};
+
+/* ── 11. PATCH renderDash to add monthly strip + health indicator ── */
+const _origRenderDash = window.renderDash;
+window.renderDash = function(){
+  if(typeof _origRenderDash === 'function') _origRenderDash();
+
+  const sumPEN = window.summary ? summary(S.mon,'PEN') : {inc:0,exp:0};
+  const balPEN = sumPEN.inc - sumPEN.exp;
+  const savRate = sumPEN.inc>0 ? (balPEN/sumPEN.inc)*100 : 0;
+  const sav = Math.round(savRate);
+
+  const totalDebt = (S?.banks||[])
+    .filter(b=>b.type==='creditcard')
+    .reduce((s,b)=>{
+      const bal = parseFloat(b.balance||0);
+      const exp = (S?.movs||[]).filter(m=>m.bankId===b.id&&m.type==='expense').reduce((a,m)=>a+(parseFloat(m.amount)||0),0);
+      const inc = (S?.movs||[]).filter(m=>m.bankId===b.id&&m.type==='income').reduce((a,m)=>a+(parseFloat(m.amount)||0),0);
+      return s + Math.abs(Math.min(bal - exp + inc, 0));
+    }, 0);
+
+  // Inject monthly strip before kpi-row if not exists
+  const kpiRow = document.querySelector('#tab-dashboard .kpi-row');
+  if(kpiRow && !document.getElementById('p3MonthStrip')){
+    const strip = document.createElement('div');
+    strip.id='p3MonthStrip'; strip.className='month-strip';
+    kpiRow.parentNode.insertBefore(strip, kpiRow);
+    const healthEl = document.createElement('div');
+    healthEl.id='p3Health';
+    kpiRow.parentNode.insertBefore(healthEl, kpiRow);
+  }
+
+  const fmt2 = (n,c='PEN')=>{ const str=c==='USD'?'US$':'S/'; return `${str} ${Math.abs(n||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})}`; };
+
+  const strip = document.getElementById('p3MonthStrip');
+  if(strip) strip.innerHTML=`
+    <div class="ms-card inc"><div class="ms-lbl">Ingresos</div><div class="ms-val inc">${fmt2(sumPEN.inc)}</div></div>
+    <div class="ms-card exp"><div class="ms-lbl">Gastos</div><div class="ms-val exp">${fmt2(sumPEN.exp)}</div></div>
+    <div class="ms-card sav"><div class="ms-lbl">Ahorro</div><div class="ms-val sav">${sav}%</div></div>
+    <div class="ms-card dbt"><div class="ms-lbl">Deuda TDC</div><div class="ms-val dbt">${totalDebt>0?'−'+fmt2(totalDebt):'—'}</div></div>`;
+
+  const health = document.getElementById('p3Health');
+  if(health){
+    let cls='good', ico='✅', msg='Finanzas saludables — buen ritmo de ahorro.';
+    if(sumPEN.exp > sumPEN.inc && sumPEN.inc>0){ cls='bad'; ico='🚨'; msg='Gastos superan ingresos este mes.'; }
+    else if(savRate < 10 && sumPEN.inc>0){ cls='warn'; ico='⚠️'; msg='Tasa de ahorro baja — reduce gastos.'; }
+    else if(totalDebt>0){ cls='warn'; ico='💳'; msg=`Deuda en tarjetas: ${fmt2(totalDebt)} — considera un plan de pago.`; }
+    else if(sumPEN.inc===0){ cls='warn'; ico='📊'; msg='Sin ingresos registrados este mes.'; }
+    health.innerHTML=`<div class="fin-health ${cls}">${ico} ${msg}</div>`;
+  }
+};
+
+/* ── 12. PATCH renderBanks to display TDC correctly ── */
+window.renderBanks = function(){
+  const bGrid = document.getElementById('bankGrid');
+  if(!bGrid) return;
+  
+  bGrid.innerHTML = (S.banks||[]).map(b=>{
+    const cur = b.currency||'PEN';
+    const saldoInicial = parseFloat(b.balance||b.saldo_inicial||0);
+    const allExpense = (S.movs||[]).filter(m=>m.bankId===b.id&&m.type==='expense').reduce((s,m)=>s+(parseFloat(m.amount)||0),0);
+    const allIncome  = (S.movs||[]).filter(m=>m.bankId===b.id&&m.type==='income' ).reduce((s,m)=>s+(parseFloat(m.amount)||0),0);
+    const linkedWIds = (S.banks||[]).filter(w=>w.type==='wallet'&&(b.wallets||[]).includes(w.name)).map(w=>w.id);
+    const walletExp  = (S.movs||[]).filter(m=>linkedWIds.includes(m.bankId)&&m.type==='expense').reduce((s,m)=>s+(parseFloat(m.amount)||0),0);
+    const totalExp = allExpense + walletExp;
+    
+    const fmt2 = (n,c)=>{ const str=c==='USD'?'US$':'S/'; return `${str} ${Math.abs(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`; };
+
+    let leftLbl = '💸 Gasto total';
+    let leftVal = `-${fmt2(totalExp, cur)}`;
+    let leftCol = 'var(--red)';
+    let rightLbl = '✅ Disponible';
+    let rightVal = 0;
+    let dispColor = 'var(--green)';
+    let btmText = saldoInicial>0? `Saldo inicial: ${fmt2(saldoInicial, cur)}` : '';
+
+    if(b.type === 'creditcard'){
+      // Para TDC, el "saldo" real es la deuda
+      // deuda = saldo inicial negativo - gastos + pagos (ingresos a la tarjeta)
+      const deuda = saldoInicial - totalExp + allIncome;
+      const limit = parseFloat(b.credit_limit||0);
+      const disp = limit + deuda; // deuda es negativo
+      
+      leftLbl = '💳 Deuda actual';
+      leftVal = fmt2(deuda, cur);
+      leftCol = 'var(--red)';
+      
+      rightLbl = '✅ Línea disp.';
+      rightVal = disp;
+      dispColor = disp>=0 ? 'var(--green)' : 'var(--red)';
+      btmText = limit>0 ? `Línea total: ${fmt2(limit, cur)}` : '';
+    } else {
+      rightVal = saldoInicial - totalExp + allIncome;
+      dispColor = rightVal>=0 ? 'var(--green)' : 'var(--red)';
+    }
+
+    const wArray = Array.isArray(b.wallets)?b.wallets:[];
+    const walletTags = wArray.length ? `<div class="wallet-chips">${wArray.map(w=>`<span class="wallet-chip">📱 ${w}</span>`).join('')}</div>` : '';
+
+    return `<div class="bank-card" style="border-color:${b.color}33">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${b.color};border-radius:var(--r) var(--r) 0 0"></div>
+      <div class="bank-card-head">
+        <div class="bank-logo" style="background:${b.color}22;color:${b.color}">${b.icon}</div>
+        <div>
+          <div class="bank-name">${b.name}</div>
+          <div class="bank-type">${window.BANK_TYPE_LABELS?window.BANK_TYPE_LABELS[b.type]:b.type} · <span class="cur-badge ${cur.toLowerCase()}">${cur}</span></div>
+        </div>
+      </div>
+      ${walletTags}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+        <div style="background:var(--bg3);border-radius:var(--rs);padding:8px">
+          <div class="bank-bal-lbl">${leftLbl}</div>
+          <div style="font-size:14px;font-weight:700;color:${leftCol}">${leftVal}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--rs);padding:8px">
+          <div class="bank-bal-lbl">${rightLbl}</div>
+          <div class="bank-bal" style="color:${dispColor}">${b.type==='creditcard' ? fmt2(rightVal, cur) : fmt2(rightVal, cur)}</div>
+        </div>
+      </div>
+      ${btmText ? `<div style="font-size:10px;color:var(--t2);margin-top:5px">${btmText}</div>` : ''}
+      <div class="bank-actions">
+        <button class="bank-btn" onclick="openBankModal('${b.id}')">&#x270F;&#xFE0F; Editar</button>
+        <button class="bank-btn danger" onclick="deleteBank('${b.id}')">&#x1F5D1;&#xFE0F; Borrar</button>
+      </div>
+    </div>`;
+  }).join('');
+  
+  if(!S.banks.length) bGrid.innerHTML = window.emptyHTML ? window.emptyHTML('🏦','Sin bancos','Agrega tu primer banco o billetera') : '';
+};
+
+/* ── 13. PATCH load() banks to fix credit_limit field ── */
+const _loadOrig2 = window.load;
+// Note: already patched in step 10 above. This just ensures credit_limit loads.
+
+/* ── INIT: run if already authenticated ── */
+if(S?.currentUser){
+  p3StartWatcher();
+  // Re-render with new dashboard
+  setTimeout(()=>{ try{ if(window.renderDash) renderDash(); }catch(e){} }, 500);
+}
+
+console.log('✅ Patch v3 loaded: session timeout + TDC fix + new categories + dashboard');
 </script>
 </body>
 </html>
