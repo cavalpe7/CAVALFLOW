@@ -666,6 +666,7 @@ body.unauth .auth-wrap {
       <button class="tbtn on exp" id="tExp" onclick="setMType('expense')">💸 Gasto</button>
       <button class="tbtn inc"    id="tInc" onclick="setMType('income')">💰 Ingreso</button>
     </div>
+    <button class="btn-outline" onclick="openTransferModal()" style="margin-bottom:15px;font-size:13px">🔄 Transferencia / Cambio / Pago TDC</button>
     <div class="amt-wrap">
       <span class="amt-cur-lbl" id="amtCurLbl">S/</span>
       <input type="number" class="amt-inp" id="amtInp" placeholder="0.00" step="0.01" min="0.01" inputmode="decimal">
@@ -679,7 +680,6 @@ body.unauth .auth-wrap {
     <div class="fg"><label class="flbl">Banco / Billetera</label><div class="bank-picker" id="bankPicker"></div></div>
     <div class="fg"><label class="flbl">Fecha</label><input type="date" class="finp" id="dateInp"></div>
     <button class="savebtn" onclick="handleSave()">✓ Guardar Movimiento</button>
-    <button class="btn-outline" onclick="openTransferModal()" style="margin-top:8px;font-size:13px">🔄 Transferencia / Cambio USD</button>
   </div>
 </div>
 
@@ -2271,6 +2271,12 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeB
   border:1px dashed rgba(124,58,237,.3);border-radius:9px}
 .cc-extra.show{display:block}
 .cc-note{font-size:11px;color:#60607a;margin-top:6px;line-height:1.5}
+
+/* Fix mobile dashboard duplication and scroll */
+@media(max-width:768px){
+  #tab-dashboard .kpi-row { display:none !important; }
+  #tab-dashboard { padding-bottom: 100px !important; }
+}
 </style>
 
 <!-- Session Warning Modal -->
@@ -2676,6 +2682,26 @@ window.renderBanks = function(){
 /* ── 13. PATCH load() banks to fix credit_limit field ── */
 const _loadOrig2 = window.load;
 // Note: already patched in step 10 above. This just ensures credit_limit loads.
+
+/* ── 14. PATCH openTransferModal visibility bug ── */
+const _origOpenTransferModal = window.openTransferModal;
+window.openTransferModal = function(){
+  if(typeof _origOpenTransferModal === 'function') _origOpenTransferModal();
+  const ov = document.getElementById('transferOverlay');
+  if(ov){
+    ov.style.display = ''; // quita display:none
+    ov.classList.add('open');
+  }
+};
+
+const _origCloseTransferModal = window.closeTransferModal;
+window.closeTransferModal = function(){
+  const ov = document.getElementById('transferOverlay');
+  if(ov) ov.classList.remove('open');
+  setTimeout(()=>{
+    if(typeof _origCloseTransferModal === 'function') _origCloseTransferModal();
+  }, 250);
+};
 
 /* ── INIT: run if already authenticated ── */
 if(S?.currentUser){
